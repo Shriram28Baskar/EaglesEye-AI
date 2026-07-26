@@ -38,18 +38,18 @@ export const triggerTwilioCall = createServerFn({ method: "POST" })
 
       const twiml = `
         <Response>
-          <Say voice="alice">Eagles Eye A.I. Alert. ${speechParts} Please respond immediately.</Say>
+          <Say>Eagles Eye A.I. Alert. ${speechParts} Please respond immediately.</Say>
         </Response>
       `;
 
       const auditLogs: any[] = [];
       const personNames: Record<string, string> = {
-        '+917539984107': 'Michael',
         '+918124175061': 'Emily',
-        '+919035890001': 'Sarah'
+        '+918122914548': 'Michael',
+        '+918667026446': 'Sarah'
       };
 
-      const escalationSequence = ['+917539984107', '+918124175061', '+919035890001'];
+      const escalationSequence = ['+918124175061', '+918122914548', '+918667026446'];
 
       for (const toPhone of escalationSequence) {
         console.log(`Escalating alert to ${toPhone}...`);
@@ -62,29 +62,20 @@ export const triggerTwilioCall = createServerFn({ method: "POST" })
         let isAnswered = false;
 
         try {
-          // Send automated WhatsApp Message
-          try {
-            // Note: Twilio Sandbox often uses +14155238886
-            await client.messages.create({
-              body: smsBody,
-              to: `whatsapp:${toPhone}`,
-              from: `whatsapp:+14155238886`, // Must use the universal Sandbox number for Trial accounts
-            });
-            console.log(`WhatsApp message sent to ${toPhone}`);
-          } catch (waErr: any) {
-            console.error(`Failed to send WhatsApp to ${toPhone}:`, waErr.message || waErr);
-          }
+          // Send automated WhatsApp Message (Concurrent, no await)
+          client.messages.create({
+            body: smsBody,
+            to: `whatsapp:${toPhone}`,
+            from: `whatsapp:+14155238886`, // Must use the universal Sandbox number for Trial accounts
+          }).then(() => console.log(`WhatsApp message sent to ${toPhone}`))
+            .catch((waErr: any) => console.error(`Failed to send WhatsApp to ${toPhone}:`, waErr.message || waErr));
 
-          // Send SMS to the current person (might fail due to trial restrictions on international SMS)
-          try {
-            await client.messages.create({
-              body: smsBody,
-              to: toPhone,
-              from: fromPhone,
-            });
-          } catch (smsErr: any) {
-            console.error(`Failed to send SMS to ${toPhone}:`, smsErr.message || smsErr);
-          }
+          // Send SMS (Concurrent, no await)
+          client.messages.create({
+            body: smsBody,
+            to: toPhone,
+            from: fromPhone,
+          }).catch((smsErr: any) => console.error(`Failed to send SMS to ${toPhone}:`, smsErr.message || smsErr));
 
           // Initiate the call with a 17-second timeout (7s for international routing + exactly 10s of ringing)
           const call = await client.calls.create({
@@ -146,6 +137,20 @@ export const triggerTwilioCall = createServerFn({ method: "POST" })
         
         if (isAnswered) {
           break; // Stop escalating if someone answered
+        }
+      }
+
+      const webhookUrl = process.env.GOOGLE_SHEETS_WEBHOOK_URL;
+      if (webhookUrl && auditLogs.length > 0) {
+        try {
+          await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(auditLogs)
+          });
+          console.log('Successfully pushed logs to Google Sheets');
+        } catch (err: any) {
+          console.error('Failed to push to Google Sheets:', err.message || err);
         }
       }
 
