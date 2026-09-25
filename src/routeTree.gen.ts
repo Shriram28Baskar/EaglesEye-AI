@@ -10,13 +10,24 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
+import { Route as CompareRouteImport } from './routes/compare'
 import { Route as MissionControlRouteImport } from './routes/mission-control'
+import { Route as NotificationsRouteImport } from './routes/notifications'
+import { Route as SimulatorRouteImport } from './routes/simulator'
+import { Route as SystemHealthRouteImport } from './routes/system-health'
 import { Route as PatientsIdRouteImport } from './routes/patients.$id'
+import { Route as WardIdAnalyticsRouteImport } from './routes/ward.$id.analytics'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AlertsRoute = AlertsRouteImport.update({
+  id: '/alerts',
+  path: '/alerts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AnalyticsRoute = AnalyticsRouteImport.update({
@@ -24,9 +35,29 @@ const AnalyticsRoute = AnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CompareRoute = CompareRouteImport.update({
+  id: '/compare',
+  path: '/compare',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MissionControlRoute = MissionControlRouteImport.update({
   id: '/mission-control',
   path: '/mission-control',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SimulatorRoute = SimulatorRouteImport.update({
+  id: '/simulator',
+  path: '/simulator',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SystemHealthRoute = SystemHealthRouteImport.update({
+  id: '/system-health',
+  path: '/system-health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PatientsIdRoute = PatientsIdRouteImport.update({
@@ -34,39 +65,99 @@ const PatientsIdRoute = PatientsIdRouteImport.update({
   path: '/patients/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WardIdAnalyticsRoute = WardIdAnalyticsRouteImport.update({
+  id: '/ward/$id/analytics',
+  path: '/ward/$id/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/alerts': typeof AlertsRoute
   '/analytics': typeof AnalyticsRoute
+  '/compare': typeof CompareRoute
   '/mission-control': typeof MissionControlRoute
+  '/notifications': typeof NotificationsRoute
+  '/simulator': typeof SimulatorRoute
+  '/system-health': typeof SystemHealthRoute
   '/patients/$id': typeof PatientsIdRoute
+  '/ward/$id/analytics': typeof WardIdAnalyticsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/alerts': typeof AlertsRoute
   '/analytics': typeof AnalyticsRoute
+  '/compare': typeof CompareRoute
   '/mission-control': typeof MissionControlRoute
+  '/notifications': typeof NotificationsRoute
+  '/simulator': typeof SimulatorRoute
+  '/system-health': typeof SystemHealthRoute
   '/patients/$id': typeof PatientsIdRoute
+  '/ward/$id/analytics': typeof WardIdAnalyticsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/alerts': typeof AlertsRoute
   '/analytics': typeof AnalyticsRoute
+  '/compare': typeof CompareRoute
   '/mission-control': typeof MissionControlRoute
+  '/notifications': typeof NotificationsRoute
+  '/simulator': typeof SimulatorRoute
+  '/system-health': typeof SystemHealthRoute
   '/patients/$id': typeof PatientsIdRoute
+  '/ward/$id/analytics': typeof WardIdAnalyticsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/analytics' | '/mission-control' | '/patients/$id'
+  fullPaths:
+    | '/'
+    | '/alerts'
+    | '/analytics'
+    | '/compare'
+    | '/mission-control'
+    | '/notifications'
+    | '/simulator'
+    | '/system-health'
+    | '/patients/$id'
+    | '/ward/$id/analytics'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/analytics' | '/mission-control' | '/patients/$id'
-  id: '__root__' | '/' | '/analytics' | '/mission-control' | '/patients/$id'
+  to:
+    | '/'
+    | '/alerts'
+    | '/analytics'
+    | '/compare'
+    | '/mission-control'
+    | '/notifications'
+    | '/simulator'
+    | '/system-health'
+    | '/patients/$id'
+    | '/ward/$id/analytics'
+  id:
+    | '__root__'
+    | '/'
+    | '/alerts'
+    | '/analytics'
+    | '/compare'
+    | '/mission-control'
+    | '/notifications'
+    | '/simulator'
+    | '/system-health'
+    | '/patients/$id'
+    | '/ward/$id/analytics'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AlertsRoute: typeof AlertsRoute
   AnalyticsRoute: typeof AnalyticsRoute
+  CompareRoute: typeof CompareRoute
   MissionControlRoute: typeof MissionControlRoute
+  NotificationsRoute: typeof NotificationsRoute
+  SimulatorRoute: typeof SimulatorRoute
+  SystemHealthRoute: typeof SystemHealthRoute
   PatientsIdRoute: typeof PatientsIdRoute
+  WardIdAnalyticsRoute: typeof WardIdAnalyticsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -78,11 +169,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/alerts': {
+      id: '/alerts'
+      path: '/alerts'
+      fullPath: '/alerts'
+      preLoaderRoute: typeof AlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/analytics': {
       id: '/analytics'
       path: '/analytics'
       fullPath: '/analytics'
       preLoaderRoute: typeof AnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compare': {
+      id: '/compare'
+      path: '/compare'
+      fullPath: '/compare'
+      preLoaderRoute: typeof CompareRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mission-control': {
@@ -92,6 +197,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MissionControlRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/simulator': {
+      id: '/simulator'
+      path: '/simulator'
+      fullPath: '/simulator'
+      preLoaderRoute: typeof SimulatorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/system-health': {
+      id: '/system-health'
+      path: '/system-health'
+      fullPath: '/system-health'
+      preLoaderRoute: typeof SystemHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/patients/$id': {
       id: '/patients/$id'
       path: '/patients/$id'
@@ -99,14 +225,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PatientsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ward/$id/analytics': {
+      id: '/ward/$id/analytics'
+      path: '/ward/$id/analytics'
+      fullPath: '/ward/$id/analytics'
+      preLoaderRoute: typeof WardIdAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AlertsRoute: AlertsRoute,
   AnalyticsRoute: AnalyticsRoute,
+  CompareRoute: CompareRoute,
   MissionControlRoute: MissionControlRoute,
+  NotificationsRoute: NotificationsRoute,
+  SimulatorRoute: SimulatorRoute,
+  SystemHealthRoute: SystemHealthRoute,
   PatientsIdRoute: PatientsIdRoute,
+  WardIdAnalyticsRoute: WardIdAnalyticsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

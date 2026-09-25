@@ -28,8 +28,18 @@ dist-ssr
 *.suo
 .env
 .env.*
+!.env.example
+
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
- 
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/

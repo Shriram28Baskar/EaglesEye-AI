@@ -1,27 +1,61 @@
-import { useEffect, useRef, useState } from "react";
-import { MessageCircle, Bell, X, Phone, ExternalLink, CheckCheck } from "lucide-react";
-import { useAlerts, whatsappLink, type AlertLog } from "@/lib/store";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { AlertTriangle, Bell, X, CheckCheck, PhoneCall, ShieldAlert, ArrowRight } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { api, createAlertsWebSocket, type AlertEvent } from "@/lib/api";
 
-function timeAgo(ts: number) {
-  const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
+function timeAgo(dateStr: string) {
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  const m = Math.floor(diff / 60);
   if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
   return `${h}h ago`;
 }
 
+const SEVERITY_COLORS: Record<string, string> = {
+  critical: "text-rose-300 border-rose-400/40 bg-rose-500/10",
+  high: "text-amber-300 border-amber-400/40 bg-amber-500/10",
+  moderate: "text-yellow-300 border-yellow-400/40 bg-yellow-500/10",
+  low: "text-emerald-300 border-emerald-400/40 bg-emerald-500/10",
+};
+
 export function AlertsPanel() {
-  const alerts = useAlerts();
+  const [alerts, setAlerts] = useState<AlertEvent[]>([]);
   const [open, setOpen] = useState(false);
-  const [seenCount, setSeenCount] = useState(alerts.length);
+  const [seenCount, setSeenCount] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
 
-  const unread = Math.max(0, alerts.length - seenCount);
+  const load = useCallback(async () => {
+    try {
+      const data = await api.getAlerts();
+      setAlerts(data);
+    } catch (e) {
+      console.error("Failed to load alerts:", e);
+    }
+  }, []);
 
   useEffect(() => {
-    if (open) setSeenCount(alerts.length);
-  }, [open, alerts.length]);
+    load();
+    const ws = createAlertsWebSocket((msg: any) => {
+      if (msg?.alerts) {
+        setAlerts(msg.alerts);
+      } else {
+        load();
+      }
+    });
+    const interval = setInterval(load, 8000);
+    return () => {
+      ws.close();
+      clearInterval(interval);
+    };
+  }, [load]);
+
+  const activeAlerts = alerts.filter(a => a.status === "generated" || a.status === "acknowledged" || a.status === "escalated");
+  const unread = Math.max(0, activeAlerts.length - seenCount);
+
+  useEffect(() => {
+    if (open) setSeenCount(activeAlerts.length);
+  }, [open, activeAlerts.length]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -31,12 +65,42 @@ export function AlertsPanel() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
+  const handleAcknowledge = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await api.acknowledgeAlert(id);
+      load();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleResolve = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await api.resolveAlert(id);
+      load();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleEscalate = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await api.escalateAlert(id);
+      load();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(o => !o)}
         className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full glass hover:bg-white/10 transition"
-        title="WhatsApp Alerts Dispatched"
+        title="Live Clinical Alerts"
       >
         <Bell className="size-3.5 text-cyan-300" />
         <span className="text-cyan-300 hidden sm:inline">Alerts</span>
@@ -48,64 +112,89 @@ export function AlertsPanel() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-[min(380px,90vw)] max-h-[70vh] overflow-hidden rounded-2xl bg-slate-950/95 backdrop-blur-2xl border border-white/10 shadow-2xl z-50 flex flex-col">
+        <div className="absolute right-0 mt-2 w-[min(420px,94vw)] max-h-[75vh] overflow-hidden rounded-2xl bg-slate-950/95 backdrop-blur-2xl border border-white/10 shadow-2xl z-50 flex flex-col">
           <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
-            <MessageCircle className="size-4 text-emerald-300" />
-            <div className="font-semibold text-sm">WhatsApp Dispatch Log</div>
-            <div className="ml-auto text-[10px] text-slate-400">{alerts.length} sent</div>
-            <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-white"><X className="size-3.5" /></button>
+            <ShieldAlert className="size-4 text-rose-400" />
+            <div className="font-semibold text-sm">Active Clinical Alerts</div>
+            <div className="ml-auto text-[10px] text-slate-400">{activeAlerts.length} active</div>
+            <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-white ml-2"><X className="size-3.5" /></button>
           </div>
 
-          <div className="overflow-y-auto flex-1 divide-y divide-white/5">
-            {alerts.length === 0 && (
-              <div className="p-6 text-center text-slate-400 text-sm">
-                No alerts yet. Auto-dispatch triggers when a patient's risk crosses 60%.
+          <div className="overflow-y-auto flex-1 divide-y divide-white/5 p-2 space-y-2">
+            {activeAlerts.length === 0 && (
+              <div className="p-8 text-center text-xs text-slate-400">
+                <CheckCheck className="size-6 text-emerald-400 mx-auto mb-2 opacity-80" />
+                No active clinical alerts. All wards within normal parameters.
               </div>
             )}
-            {alerts.map(a => <AlertItem key={a.id} a={a} />)}
+            {activeAlerts.map(a => (
+              <div key={a.id} className="p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 space-y-2 transition">
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase border ${SEVERITY_COLORS[a.severity] ?? ""}`}>
+                    {a.severity}
+                  </span>
+                  <span className="text-[10px] font-mono text-cyan-300">
+                    {a.alert_type === "correlated" ? "🔗 Correlated" : "Single Vital"}
+                  </span>
+                  <span className="text-[10px] text-slate-500 ml-auto">{timeAgo(a.created_at)}</span>
+                </div>
+
+                <div className="font-medium text-xs text-white">
+                  {a.abnormality_type} · Patient {a.patient_id}
+                </div>
+                <div className="text-[11px] text-slate-300 leading-snug">
+                  {a.message}
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  {a.status === "generated" && (
+                    <button
+                      onClick={(e) => handleAcknowledge(a.id, e)}
+                      className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-[10px] font-medium text-slate-200 transition"
+                    >
+                      Acknowledge
+                    </button>
+                  )}
+                  {a.status !== "resolved" && (
+                    <button
+                      onClick={(e) => handleResolve(a.id, e)}
+                      className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 text-[10px] font-medium transition"
+                    >
+                      Resolve
+                    </button>
+                  )}
+                  {a.status !== "escalated" && (
+                    <button
+                      onClick={(e) => handleEscalate(a.id, e)}
+                      className="px-2 py-1 rounded bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 text-[10px] font-medium flex items-center gap-1 transition"
+                    >
+                      <PhoneCall className="size-3" /> Escalate (Call)
+                    </button>
+                  )}
+                  <Link
+                    to="/patients/$id"
+                    params={{ id: a.patient_id }}
+                    onClick={() => setOpen(false)}
+                    className="ml-auto text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-0.5"
+                  >
+                    View <ArrowRight className="size-3" />
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="p-2 border-t border-white/10 bg-slate-900/50 text-center">
+            <Link
+              to="/alerts"
+              onClick={() => setOpen(false)}
+              className="text-xs text-cyan-300 hover:underline font-medium inline-flex items-center gap-1"
+            >
+              Open Full Alert Center <ArrowRight className="size-3" />
+            </Link>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function AlertItem({ a }: { a: AlertLog }) {
-  return (
-    <div className="p-3 hover:bg-white/[0.03]">
-      <div className="flex items-start gap-2">
-        <div className="size-8 shrink-0 rounded-full bg-emerald-500/20 grid place-items-center mt-0.5">
-          <MessageCircle className="size-4 text-emerald-300" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="font-semibold text-white truncate">Nurse {a.nurse.name}</span>
-            <span className="text-slate-500">·</span>
-            <a href={`tel:+${a.nurse.phone}`} className="text-slate-400 hover:text-white transition-colors truncate flex items-center gap-1"><Phone className="size-3" />+{a.nurse.phone}</a>
-            <span className="ml-auto text-[10px] text-slate-500 shrink-0">{timeAgo(a.ts)}</span>
-          </div>
-          <div className="text-xs text-slate-300 mt-1">
-            <span className="text-rose-300 font-medium">{a.patientName}</span>
-            <span className="text-slate-500"> · {a.patientId} · risk </span>
-            <span className="text-amber-300 font-semibold">{a.risk}%</span>
-          </div>
-          <pre className="mt-2 whitespace-pre-wrap text-[11px] text-slate-300 bg-black/30 border border-white/5 rounded-lg p-2 max-h-32 overflow-y-auto font-sans">
-{a.message}
-          </pre>
-          <div className="flex items-center justify-between mt-2">
-            <span className="text-[10px] text-emerald-300 flex items-center gap-1">
-              <CheckCheck className="size-3" /> Delivered via WhatsApp
-            </span>
-            <a
-              href={whatsappLink(a.nurse.phone, a.message)}
-              target="_blank" rel="noreferrer"
-              className="text-[11px] text-cyan-300 hover:text-cyan-200 flex items-center gap-1"
-            >
-              Open chat <ExternalLink className="size-3" />
-            </a>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
