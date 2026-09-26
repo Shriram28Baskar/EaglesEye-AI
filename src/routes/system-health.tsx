@@ -197,9 +197,9 @@ export function SystemHealthPage() {
                 <div className="clinical-panel rounded-2xl p-5 space-y-4">
                   <div className="text-xs font-bold text-slate-300 uppercase tracking-wider">Stage-by-Stage Breakdown (Avg)</div>
                   {[
-                    { key: "db_write_ms", label: "DB Hypertable Write", icon: "🗄️", sla: 50 },
+                    { key: "db_write_ms", label: "Database Read/Write (TimescaleDB)", icon: "🗄️", sla: 100 },
                     { key: "risk_engine_ms", label: "Risk Engine (Rules + XGBoost Hybrid)", icon: "🧠", sla: 150 },
-                    { key: "ml_inference_ms", label: "XGBoost ML Inference (est. 40%)", icon: "⚡", sla: 60 },
+                    { key: "ml_inference_ms", label: "XGBoost ML Model Inference", icon: "⚡", sla: 40 },
                     { key: "explainability_ms", label: "SHAP Explainability Attribution", icon: "🔍", sla: 30 },
                     { key: "prediction_ms", label: "Trajectory Predictor", icon: "📈", sla: 20 },
                     { key: "alert_correlation_ms", label: "Redis Sliding-Window Alert Correlation", icon: "🔔", sla: 50 },

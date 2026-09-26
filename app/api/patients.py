@@ -364,7 +364,7 @@ async def _run_ai_pipeline(
                 "trend": "stable", "model_version": "rules-fallback", "ai_degraded": True,
             }
         lat["risk_engine_ms"] = round((time.perf_counter() - t0) * 1000, 2)
-        lat["ml_inference_ms"] = round(lat["risk_engine_ms"] * 0.4, 2)
+        lat["ml_inference_ms"] = risk_data.get("ml_inference_ms", 0.0)
 
         # Compute trend from history (chronological order: oldest -> newest)
         if len(risk_scores) >= 1:

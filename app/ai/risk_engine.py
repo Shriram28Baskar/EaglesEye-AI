@@ -46,7 +46,10 @@ async def compute_risk(
 
     rules_risk = max(0.0, min(100.0, rules_risk + trend_adj + correlation_bonus))
     
+    import time
+    t_ml = time.perf_counter()
     ml_prob, _ = predict_deterioration(vitals_history, age)
+    ml_inference_ms = round((time.perf_counter() - t_ml) * 1000, 2)
     
     if len(vitals_history) > 0 and ml_prob is not None:
         final_risk = 0.6 * rules_risk + 0.4 * (ml_prob * 100.0)
@@ -96,7 +99,8 @@ async def compute_risk(
         'reasoning': reasoning,
         'trend': 'stable',
         'model_version': model_version,
-        'ai_degraded': ai_degraded
+        'ai_degraded': ai_degraded,
+        'ml_inference_ms': ml_inference_ms,
     }
 
 def compute_trend(risk_history: list[float]) -> str:
