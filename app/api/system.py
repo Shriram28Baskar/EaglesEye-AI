@@ -104,3 +104,15 @@ async def health_check(db: AsyncSession = Depends(get_db)):
         overall = "down"
 
     return {"overall": overall, "services": services}
+
+
+@router.get("/system/latency")
+async def get_pipeline_latency():
+    """
+    Returns rolling pipeline latency statistics from Redis.
+    Covers per-stage avg/P95/P99 across the last 100 vital ingestion cycles.
+    """
+    from app.services.latency_tracker import get_latency_stats
+    redis = get_redis()
+    stats = await get_latency_stats(redis)
+    return stats

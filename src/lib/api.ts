@@ -96,6 +96,29 @@ export interface SystemHealth {
   services: Record<string, { status: string; [key: string]: unknown }>;
 }
 
+export interface StageStats {
+  avg_ms: number;
+  p95_ms: number;
+  p99_ms: number;
+  min_ms: number;
+  max_ms: number;
+}
+
+export interface PipelineLatency {
+  sample_count: number;
+  stages: {
+    db_write_ms?: StageStats;
+    risk_engine_ms?: StageStats;
+    ml_inference_ms?: StageStats;
+    explainability_ms?: StageStats;
+    prediction_ms?: StageStats;
+    alert_correlation_ms?: StageStats;
+    ws_broadcast_ms?: StageStats;
+    total_pipeline_ms?: StageStats;
+  };
+  recent: Array<{ patient_id: string; ts: number; total_pipeline_ms: number; [key: string]: unknown }>;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
@@ -249,3 +272,10 @@ export function createAlertsWebSocket(onMessage: (data: unknown) => void): WebSo
   ws.onerror = (e) => console.error("Alerts WS error:", e);
   return ws;
 }
+
+// ── Latency API ───────────────────────────────────────────────────────────
+
+export const latencyApi = {
+  getStats: (): Promise<PipelineLatency> =>
+    apiFetch<PipelineLatency>("/api/system/latency"),
+};

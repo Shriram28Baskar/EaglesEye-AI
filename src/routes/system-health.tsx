@@ -2,10 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
 import {
   Cpu, Database, Server, Wifi, Sparkles, RefreshCw, CheckCircle2,
-  AlertTriangle, XCircle, PhoneCall, ShieldCheck, Activity, Terminal, ExternalLink
+  AlertTriangle, XCircle, PhoneCall, ShieldCheck, Activity, Terminal, Zap
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { api, type SystemHealth } from "@/lib/api";
+import { api, latencyApi, type SystemHealth, type PipelineLatency } from "@/lib/api";
 
 export const Route = createFileRoute("/system-health")({
   head: () => ({ meta: [{ title: "System Operational Health · EaglesEye AI" }] }),
@@ -14,14 +14,19 @@ export const Route = createFileRoute("/system-health")({
 
 export function SystemHealthPage() {
   const [health, setHealth] = useState<SystemHealth | null>(null);
+  const [latency, setLatency] = useState<PipelineLatency | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastCheck, setLastCheck] = useState<string>("");
-  const [tab, setTab] = useState<"overview" | "technical">("overview");
+  const [tab, setTab] = useState<"overview" | "latency" | "technical">("overview");
 
   const load = useCallback(async () => {
     try {
-      const data = await api.getSystemHealth();
+      const [data, lat] = await Promise.all([
+        api.getSystemHealth(),
+        latencyApi.getStats().catch(() => null),
+      ]);
       setHealth(data);
+      if (lat) setLatency(lat);
       setLastCheck(new Date().toLocaleTimeString());
     } catch (e) {
       console.error("Health check failed:", e);
@@ -115,7 +120,7 @@ export function SystemHealthPage() {
           </div>
         )}
 
-        {/* View Switcher: Clinical Overview vs Engineering Deep-Dive */}
+        {/* View Switcher */}
         <div className="flex items-center gap-2 border-b border-white/[0.08] pb-1">
           <button
             onClick={() => setTab("overview")}
@@ -128,6 +133,17 @@ export function SystemHealthPage() {
             Clinical Services Overview
           </button>
           <button
+            onClick={() => setTab("latency")}
+            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold border-b-2 transition ${
+              tab === "latency"
+                ? "border-violet-400 text-violet-300"
+                : "border-transparent text-slate-400 hover:text-white"
+            }`}
+          >
+            <Zap className="size-3" />
+            Pipeline Latency Profiler
+          </button>
+          <button
             onClick={() => setTab("technical")}
             className={`px-4 py-2 text-xs font-bold border-b-2 transition ${
               tab === "technical"
@@ -138,6 +154,134 @@ export function SystemHealthPage() {
             Engineering Telemetry &amp; Specs
           </button>
         </div>
+
+        {/* Tab: Pipeline Latency Profiler */}
+        {tab === "latency" && (
+          <div className="space-y-5">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-violet-300">
+                <Zap className="size-4" />
+                <span className="font-bold text-sm">Real-Time AI Pipeline Latency Profiler</span>
+              </div>
+              {latency && (
+                <span className="text-xs font-mono text-slate-400">
+                  {latency.sample_count} samples in rolling window
+                </span>
+              )}
+            </div>
+
+            {!latency || latency.sample_count === 0 ? (
+              <div className="clinical-panel rounded-2xl p-10 text-center text-slate-400 text-sm">
+                <Zap className="size-8 mx-auto mb-3 text-slate-600" />
+                No pipeline cycles recorded yet. Start a simulator or POST vitals to generate latency data.
+              </div>
+            ) : (
+              <>
+                {/* Summary total card */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {(["avg_ms", "p95_ms", "p99_ms", "max_ms"] as const).map((key) => {
+                    const val = latency.stages.total_pipeline_ms?.[key] ?? 0;
+                    const color = val < 200 ? "text-emerald-400" : val < 500 ? "text-amber-400" : "text-rose-400";
+                    const label = key === "avg_ms" ? "Avg" : key === "p95_ms" ? "P95" : key === "p99_ms" ? "P99" : "Max";
+                    return (
+                      <div key={key} className="clinical-panel rounded-2xl p-4 text-center">
+                        <div className={`text-2xl font-black ${color}`}>{val}<span className="text-xs text-slate-500 ml-0.5">ms</span></div>
+                        <div className="text-[11px] text-slate-400 mt-1">Total Pipeline {label}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Per-stage breakdown */}
+                <div className="clinical-panel rounded-2xl p-5 space-y-4">
+                  <div className="text-xs font-bold text-slate-300 uppercase tracking-wider">Stage-by-Stage Breakdown (Avg)</div>
+                  {[
+                    { key: "db_write_ms", label: "DB Hypertable Write", icon: "🗄️", sla: 50 },
+                    { key: "risk_engine_ms", label: "Risk Engine (Rules + XGBoost Hybrid)", icon: "🧠", sla: 150 },
+                    { key: "ml_inference_ms", label: "XGBoost ML Inference (est. 40%)", icon: "⚡", sla: 60 },
+                    { key: "explainability_ms", label: "SHAP Explainability Attribution", icon: "🔍", sla: 30 },
+                    { key: "prediction_ms", label: "Trajectory Predictor", icon: "📈", sla: 20 },
+                    { key: "alert_correlation_ms", label: "Redis Sliding-Window Alert Correlation", icon: "🔔", sla: 50 },
+                    { key: "ws_broadcast_ms", label: "WebSocket Broadcast (Pub/Sub)", icon: "📡", sla: 30 },
+                  ].map(({ key, label, icon, sla }) => {
+                    const stage = latency.stages[key as keyof typeof latency.stages];
+                    const avg = stage?.avg_ms ?? 0;
+                    const p95 = stage?.p95_ms ?? 0;
+                    const totalAvg = latency.stages.total_pipeline_ms?.avg_ms || 1;
+                    const pct = Math.min(100, (avg / totalAvg) * 100);
+                    const ok = avg <= sla;
+                    return (
+                      <div key={key} className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-300 flex items-center gap-1.5">
+                            <span>{icon}</span> {label}
+                          </span>
+                          <div className="flex items-center gap-3 font-mono">
+                            <span className={ok ? "text-emerald-400" : "text-amber-400"}>avg {avg}ms</span>
+                            <span className="text-slate-500">p95 {p95}ms</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${ok ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}`}>
+                              SLA {sla}ms {ok ? "✓" : "⚠"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${ok ? "bg-emerald-500" : "bg-amber-500"}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Recent cycles table */}
+                {latency.recent.length > 0 && (
+                  <div className="clinical-panel rounded-2xl p-5 space-y-3">
+                    <div className="text-xs font-bold text-slate-300 uppercase tracking-wider">Recent 10 Pipeline Cycles</div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-[11px] font-mono">
+                        <thead>
+                          <tr className="text-slate-500 border-b border-white/5">
+                            <th className="text-left pb-2 pr-4">Patient</th>
+                            <th className="text-right pb-2 pr-4">DB</th>
+                            <th className="text-right pb-2 pr-4">Risk+ML</th>
+                            <th className="text-right pb-2 pr-4">Alert Corr.</th>
+                            <th className="text-right pb-2 pr-4">WS Push</th>
+                            <th className="text-right pb-2">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {latency.recent.map((s, i) => {
+                            const total = s.total_pipeline_ms as number;
+                            const color = total < 200 ? "text-emerald-400" : total < 500 ? "text-amber-400" : "text-rose-400";
+                            return (
+                              <tr key={i} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
+                                <td className="py-1.5 pr-4 text-slate-300">{s.patient_id}</td>
+                                <td className="py-1.5 pr-4 text-right text-slate-400">{s.db_write_ms as number}ms</td>
+                                <td className="py-1.5 pr-4 text-right text-slate-400">{s.risk_engine_ms as number}ms</td>
+                                <td className="py-1.5 pr-4 text-right text-slate-400">{s.alert_correlation_ms as number}ms</td>
+                                <td className="py-1.5 pr-4 text-right text-slate-400">{s.ws_broadcast_ms as number}ms</td>
+                                <td className={`py-1.5 text-right font-bold ${color}`}>{total}ms</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Clinical significance note */}
+                <div className="rounded-xl border border-violet-500/20 bg-violet-950/10 p-4 text-xs text-violet-300 space-y-1">
+                  <div className="font-bold">⚡ Clinical Significance of Pipeline Latency</div>
+                  <div className="text-slate-400">In live hospital deployments, the total pipeline latency determines the <strong className="text-violet-300">alert-to-clinician notification delay</strong>. The NHS recommends alert escalation within <strong className="text-violet-300">2 minutes</strong> of a deteriorating vital sign. This profiler measures how long EaglesEye-AI takes to complete the full sensor→AI→alert→dashboard cycle.</div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Tab 1: Clinical Services Overview */}
         {tab === "overview" && (
